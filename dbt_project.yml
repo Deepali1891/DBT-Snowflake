@@ -1,0 +1,52 @@
+name: 'ecommerce_pipeline'
+version: '1.0.0'
+config-version: 2
+
+# This setting configures which "profile" dbt uses for this project.
+# Profiles contain credentials for connecting to your data warehouse.
+profile: 'ecommerce_pipeline'
+
+# Paths to various project directories
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+# Model configurations by folder/layer
+models:
+  ecommerce_pipeline:
+    # Bronze layer: raw data loaded from S3 - stored as views for lightweight access
+    bronze:
+      +materialized: view
+      +schema: bronze
+      +tags: ['bronze']
+
+    # Silver layer: cleaned and transformed data - stored as tables for performance
+    silver:
+      +materialized: table
+      +schema: silver
+      +tags: ['silver']
+
+    # Gold layer: business-ready aggregated models - stored as tables
+    gold:
+      +materialized: table
+      +schema: gold
+      +tags: ['gold']
+
+# Seed configurations
+seeds:
+  ecommerce_pipeline:
+    +schema: seeds
+
+# Snapshot configurations
+snapshots:
+  ecommerce_pipeline:
+    +target_schema: snapshots
+    +strategy: timestamp
+    +updated_at: updated_at

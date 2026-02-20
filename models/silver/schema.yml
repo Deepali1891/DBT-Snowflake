@@ -1,0 +1,133 @@
+version: 2
+
+models:
+  - name: stg_orders
+    description: >
+      Cleaned and standardised order records from the bronze raw_orders table.
+      Prices are converted from cents to dollars. Status values are lower-cased.
+    columns:
+      - name: order_id
+        description: Unique identifier for each order.
+        tests:
+          - not_null
+          - unique
+      - name: customer_id
+        description: Foreign key to stg_customers.
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_customers')
+              field: customer_id
+      - name: product_id
+        description: Foreign key to stg_products.
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_products')
+              field: product_id
+      - name: order_date
+        description: Date the order was placed.
+        tests:
+          - not_null
+      - name: quantity
+        description: Number of units ordered.
+        tests:
+          - not_null
+          - positive_value
+      - name: unit_price_cents
+        description: Unit price in cents.
+        tests:
+          - not_null
+      - name: unit_price
+        description: Unit price in dollars.
+        tests:
+          - not_null
+      - name: total_price_cents
+        description: Total order value in cents (quantity × unit_price_cents).
+        tests:
+          - not_null
+      - name: total_price
+        description: Total order value in dollars.
+        tests:
+          - not_null
+      - name: status
+        description: Order status (lower-cased).
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['pending', 'processing', 'shipped', 'delivered', 'cancelled']
+      - name: created_at
+        description: Timestamp when the record was created.
+      - name: updated_at
+        description: Timestamp when the record was last updated.
+
+  - name: stg_customers
+    description: >
+      Cleaned and standardised customer records from the bronze raw_customers table.
+      Names are title-cased and email addresses are lower-cased.
+    columns:
+      - name: customer_id
+        description: Unique identifier for each customer.
+        tests:
+          - not_null
+          - unique
+      - name: first_name
+        description: Customer first name (title-cased, trimmed).
+        tests:
+          - not_null
+      - name: last_name
+        description: Customer last name (title-cased, trimmed).
+        tests:
+          - not_null
+      - name: email
+        description: Customer email address (lower-cased, trimmed).
+        tests:
+          - not_null
+          - unique
+      - name: phone
+        description: Customer phone number.
+      - name: country
+        description: Customer country (title-cased).
+      - name: city
+        description: Customer city (title-cased).
+      - name: created_at
+        description: Timestamp when the customer record was created.
+      - name: updated_at
+        description: Timestamp when the record was last updated.
+
+  - name: stg_products
+    description: >
+      Cleaned and standardised product records from the bronze raw_products table.
+      Prices are converted from cents to dollars and strings are normalised.
+    columns:
+      - name: product_id
+        description: Unique identifier for each product.
+        tests:
+          - not_null
+          - unique
+      - name: product_name
+        description: Product name (title-cased, trimmed).
+        tests:
+          - not_null
+      - name: category
+        description: Product category (title-cased).
+        tests:
+          - not_null
+      - name: subcategory
+        description: Product subcategory (title-cased).
+      - name: unit_price_cents
+        description: Unit price in cents.
+        tests:
+          - not_null
+      - name: unit_price
+        description: Unit price in dollars.
+        tests:
+          - not_null
+      - name: is_active
+        description: Whether the product is currently active.
+        tests:
+          - not_null
+      - name: created_at
+        description: Timestamp when the product record was created.
+      - name: updated_at
+        description: Timestamp when the record was last updated.
