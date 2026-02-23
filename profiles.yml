@@ -1,0 +1,42 @@
+# dbt profiles.yml template for Snowflake connection
+#
+# Copy this file to ~/.dbt/profiles.yml and fill in your credentials.
+# Never commit your actual profiles.yml with real credentials to version control.
+#
+# Alternatively, set environment variables (recommended for CI/CD):
+#   - DBT_SNOWFLAKE_ACCOUNT
+#   - DBT_SNOWFLAKE_USER
+#   - DBT_SNOWFLAKE_PASSWORD
+#   - DBT_SNOWFLAKE_ROLE
+#   - DBT_SNOWFLAKE_DATABASE
+#   - DBT_SNOWFLAKE_WAREHOUSE
+#   - DBT_SNOWFLAKE_SCHEMA
+
+ecommerce_pipeline:
+  target: dev
+  outputs:
+    dev:
+      type: snowflake
+      account: "{{ env_var('DBT_SNOWFLAKE_ACCOUNT') }}"
+      user: "{{ env_var('DBT_SNOWFLAKE_USER') }}"
+      password: "{{ env_var('DBT_SNOWFLAKE_PASSWORD') }}"
+      role: "{{ env_var('DBT_SNOWFLAKE_ROLE', 'TRANSFORMER') }}"
+      database: "{{ env_var('DBT_SNOWFLAKE_DATABASE') }}"
+      warehouse: "{{ env_var('DBT_SNOWFLAKE_WAREHOUSE') }}"
+      schema: "{{ env_var('DBT_SNOWFLAKE_SCHEMA', 'dbt_dev') }}"
+      threads: 4
+      client_session_keep_alive: False
+      query_tag: dbt_dev
+
+    prod:
+      type: snowflake
+      account: "{{ env_var('DBT_SNOWFLAKE_ACCOUNT') }}"
+      user: "{{ env_var('DBT_SNOWFLAKE_USER') }}"
+      password: "{{ env_var('DBT_SNOWFLAKE_PASSWORD') }}"
+      role: "{{ env_var('DBT_SNOWFLAKE_ROLE', 'TRANSFORMER') }}"
+      database: "{{ env_var('DBT_SNOWFLAKE_DATABASE') }}"
+      warehouse: "{{ env_var('DBT_SNOWFLAKE_WAREHOUSE') }}"
+      schema: "{{ env_var('DBT_SNOWFLAKE_SCHEMA', 'dbt_prod') }}"
+      threads: 8
+      client_session_keep_alive: False
+      query_tag: dbt_prod
