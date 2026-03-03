@@ -43,13 +43,40 @@ git clone https://github.com/Deepali1891/DBT-Snowflake.git
 cd DBT-Snowflake
 ```
 
-### 2. Install dbt and the Snowflake adapter
+### 2. Create and activate a virtual environment (recommended)
+
+Create an isolated Python environment to keep dependencies local to this project.
+
+POSIX / macOS:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+```
+
+Windows (PowerShell):
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+
+Windows (Command Prompt):
+
+```cmd
+python -m venv .venv
+.venv\Scripts\activate.bat
+```
+
+After activating the virtual environment, install dbt and the Snowflake adapter in the next step.
+
+### 3. Install dbt and the Snowflake adapter
 
 ```bash
 pip install dbt-snowflake
 ```
 
-### 3. Set your Snowflake credentials
+### 4. Set your Snowflake credentials
 
 Copy the example environment file and fill in your values:
 
@@ -64,7 +91,7 @@ Then export the variables (or use a tool like [direnv](https://direnv.net/)):
 export $(grep -v '^#' .env | xargs)
 ```
 
-### 4. Configure the dbt profile
+### 5. Configure the dbt profile
 
 Copy `profiles.yml` to your dbt home directory:
 
@@ -74,13 +101,13 @@ cp profiles.yml ~/.dbt/profiles.yml
 
 The profile reads credentials from environment variables so no secrets are stored in the file.
 
-### 5. Install dbt packages
+### 6. Install dbt packages
 
 ```bash
 dbt deps
 ```
 
-### 6. Test the Snowflake connection
+### 7. Test the Snowflake connection
 
 ```bash
 dbt debug

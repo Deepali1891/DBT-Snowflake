@@ -6,105 +6,113 @@ sources:
       Raw data loaded from AWS S3 into Snowflake's bronze schema.
       These tables are populated via Snowflake external stages or COPY INTO commands
       and represent the landing zone for all ingested data.
-    database: "{{ env_var('DBT_SNOWFLAKE_DATABASE') }}"
+    database: "CAPSTONE_DG"
     schema: bronze
     tables:
       - name: raw_orders
-        description: Raw order transactions loaded from S3.
         columns:
           - name: order_id
-            description: Unique identifier for each order.
             tests:
               - not_null
               - unique
           - name: customer_id
-            description: Foreign key to the customers table.
+            tests:
+              - not_null
+          - name: order_status
+            tests:
+              - not_null
+          - name: order_purchase_timestamp
+            tests:
+              - not_null
+
+      - name: raw_order_items
+        columns:
+          - name: order_id
+            tests:
+              - not_null
+          - name: order_item_id
             tests:
               - not_null
           - name: product_id
-            description: Foreign key to the products table.
             tests:
               - not_null
-          - name: order_date
-            description: Date the order was placed (YYYY-MM-DD).
+          - name: seller_id
             tests:
               - not_null
-          - name: quantity
-            description: Number of units ordered.
+
+      - name: raw_order_payments
+        columns:
+          - name: order_id
             tests:
               - not_null
-          - name: unit_price_cents
-            description: Unit price in cents at the time of order.
+          - name: payment_sequential
             tests:
               - not_null
-          - name: status
-            description: Order status (pending, processing, shipped, delivered, cancelled).
+          - name: payment_type
             tests:
               - not_null
-          - name: created_at
-            description: Timestamp when the record was created.
-          - name: updated_at
-            description: Timestamp when the record was last updated.
+
+      - name: raw_order_reviews
+        columns:
+          - name: review_id
+            tests:
+              - not_null
+          - name: order_id
+            tests:
+              - not_null
+          - name: review_score
+            tests:
+              - not_null
 
       - name: raw_customers
-        description: Raw customer records loaded from S3.
         columns:
           - name: customer_id
-            description: Unique identifier for each customer.
             tests:
               - not_null
               - unique
-          - name: first_name
-            description: Customer's first name.
+          - name: customer_unique_id
             tests:
               - not_null
-          - name: last_name
-            description: Customer's last name.
+
+      - name: raw_geolocation
+        columns:
+          - name: geolocation_zip_code_prefix
             tests:
               - not_null
-          - name: email
-            description: Customer's email address.
+          - name: geolocation_city
             tests:
               - not_null
-              - unique
-          - name: phone
-            description: Customer's phone number.
-          - name: country
-            description: Customer's country of residence.
-          - name: city
-            description: Customer's city of residence.
-          - name: created_at
-            description: Timestamp when the customer record was created.
-          - name: updated_at
-            description: Timestamp when the record was last updated.
+          - name: geolocation_state
+            tests:
+              - not_null
 
       - name: raw_products
-        description: Raw product catalog loaded from S3.
         columns:
           - name: product_id
-            description: Unique identifier for each product.
             tests:
               - not_null
               - unique
-          - name: product_name
-            description: Name of the product.
+          - name: product_category_name
+
+      - name: raw_product_category_name_translation
+        columns:
+          - name: product_category_name
             tests:
               - not_null
-          - name: category
-            description: Product category.
+              - unique
+
+      - name: raw_sellers
+        columns:
+          - name: seller_id
             tests:
               - not_null
-          - name: subcategory
-            description: Product subcategory.
-          - name: unit_price_cents
-            description: Current unit price of the product in cents.
+              - unique
+          - name: seller_zip_code_prefix
             tests:
               - not_null
-          - name: is_active
-            description: Whether the product is currently active (TRUE/FALSE).
+          - name: seller_city
             tests:
               - not_null
-          - name: created_at
-            description: Timestamp when the product record was created.
-          - name: updated_at
-            description: Timestamp when the record was last updated.
+          - name: seller_state
+            tests:
+              - not_null
