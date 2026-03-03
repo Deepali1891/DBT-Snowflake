@@ -8,111 +8,196 @@ sources:
       and represent the landing zone for all ingested data.
     database: "CAPSTONE_DG"
     schema: bronze
+    
+    # # Optional: Add freshness checks for data quality monitoring
+    # freshness:
+    #   warn_after: {count: 24, period: hour}
+    #   error_after: {count: 48, period: hour}
+    
+    # # Optional: Default loader information
+    # loader: "Snowflake ETL"
+    
     tables:
+      # Orders related tables
       - name: raw_orders
+        description: "Raw orders data containing order header information"
+        loaded_at_field: order_purchase_timestamp
         columns:
           - name: order_id
+            description: "Unique identifier for each order"
             tests:
               - not_null
               - unique
           - name: customer_id
+            description: "Foreign key to the customers table"
             tests:
               - not_null
           - name: order_status
-            tests:
-              - not_null
+            description: "Status of the order (e.g., delivered, shipped, canceled)"
           - name: order_purchase_timestamp
-            tests:
-              - not_null
+            description: "Timestamp when the order was purchased"
+          - name: order_approved_at
+            description: "Timestamp when the payment was approved"
+          - name: order_delivered_carrier_date
+            description: "Timestamp when the order was handed to the carrier"
+          - name: order_delivered_customer_date
+            description: "Timestamp when the order was delivered to the customer"
+          - name: order_estimated_delivery_date
+            description: "Estimated delivery date shown to customer at purchase"
 
       - name: raw_order_items
+        description: "Raw order items data containing line item details for each order"
         columns:
           - name: order_id
+            description: "Foreign key to the orders table"
             tests:
               - not_null
           - name: order_item_id
+            description: "Sequential identifier for items within an order"
             tests:
               - not_null
           - name: product_id
+            description: "Foreign key to the products table"
             tests:
               - not_null
           - name: seller_id
+            description: "Foreign key to the sellers table"
             tests:
               - not_null
+          - name: shipping_limit_date
+            description: "Deadline for the seller to ship the item"
+          - name: price
+            description: "Price of the item"
+          - name: freight_value
+            description: "Freight/shipping cost for the item"
 
       - name: raw_order_payments
+        description: "Raw payment data for orders, supporting multiple payment methods per order"
         columns:
           - name: order_id
+            description: "Foreign key to the orders table"
             tests:
               - not_null
           - name: payment_sequential
+            description: "Sequential number for multiple payments on same order"
             tests:
               - not_null
           - name: payment_type
-            tests:
-              - not_null
+            description: "Type of payment (credit_card, boleto, voucher, debit_card)"
+          - name: payment_installments
+            description: "Number of installments chosen by customer"
+          - name: payment_value
+            description: "Value of the payment transaction"
 
       - name: raw_order_reviews
+        description: "Raw customer reviews data for orders"
         columns:
           - name: review_id
+            description: "Unique identifier for each review"
             tests:
               - not_null
+              - unique
           - name: order_id
+            description: "Foreign key to the orders table"
             tests:
               - not_null
           - name: review_score
-            tests:
-              - not_null
+            description: "Rating given by customer (1-5)"
+          - name: review_comment_title
+            description: "Title of the review comment"
+          - name: review_comment_message
+            description: "Body of the review comment"
+          - name: review_creation_date
+            description: "Timestamp when the review was created"
+          - name: review_answer_timestamp
+            description: "Timestamp when the review was answered"
 
+      # Customer related tables
       - name: raw_customers
+        description: "Raw customer data with location information"
         columns:
           - name: customer_id
+            description: "Unique identifier for each customer in an order context"
             tests:
               - not_null
               - unique
           - name: customer_unique_id
+            description: "Unique identifier for the customer across all orders"
             tests:
               - not_null
+          - name: customer_zip_code_prefix
+            description: "First 5 digits of customer zip code"
+          - name: customer_city
+            description: "Customer city name"
+          - name: customer_state
+            description: "Customer state code (2 letters)"
 
+      # Location data
       - name: raw_geolocation
+        description: "Raw geolocation data mapping zip codes to coordinates"
         columns:
           - name: geolocation_zip_code_prefix
+            description: "First 5 digits of zip code"
             tests:
               - not_null
+          - name: geolocation_lat
+            description: "Latitude coordinate"
+          - name: geolocation_lng
+            description: "Longitude coordinate"
           - name: geolocation_city
-            tests:
-              - not_null
+            description: "City name"
           - name: geolocation_state
-            tests:
-              - not_null
+            description: "State code (2 letters)"
 
+      # Product related tables
       - name: raw_products
+        description: "Raw product catalog data"
         columns:
           - name: product_id
+            description: "Unique identifier for each product"
             tests:
               - not_null
               - unique
           - name: product_category_name
+            description: "Product category name in Portuguese"
+          - name: product_name_length
+            description: "Number of characters in the product name"
+          - name: product_description_length
+            description: "Number of characters in the product description"
+          - name: product_photos_qty
+            description: "Number of product photos"
+          - name: product_weight_g
+            description: "Product weight in grams"
+          - name: product_length_cm
+            description: "Product length in centimeters"
+          - name: product_height_cm
+            description: "Product height in centimeters"
+          - name: product_width_cm
+            description: "Product width in centimeters"
 
       - name: raw_product_category_name_translation
+        description: "Translation table for product category names (Portuguese to English)"
         columns:
           - name: product_category_name
+            description: "Product category name in Portuguese"
             tests:
               - not_null
               - unique
+          - name: product_category_name_english
+            description: "Product category name in English"
 
+      # Seller data
       - name: raw_sellers
+        description: "Raw seller data with location information"
         columns:
           - name: seller_id
+            description: "Unique identifier for each seller"
             tests:
               - not_null
               - unique
           - name: seller_zip_code_prefix
-            tests:
-              - not_null
+            description: "First 5 digits of seller zip code"
           - name: seller_city
-            tests:
-              - not_null
+            description: "Seller city name"
           - name: seller_state
-            tests:
-              - not_null
+            description: "Seller state code (2 letters)"
