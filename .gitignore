@@ -1,4 +1,5 @@
 # dbt artifacts
+profiles.yml
 target/
 dbt_packages/
 logs/

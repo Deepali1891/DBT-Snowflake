@@ -1,0 +1,230 @@
+version: 2
+
+models:
+  - name: stg_customers
+    description: "Cleaned customer records with normalized city and state"
+    columns:
+      - name: customer_id
+        description: "Unique identifier for each customer in an order context"
+        tests:
+          - not_null
+          - unique
+      - name: customer_unique_id
+        description: "Unique identifier for the customer across all orders"
+        tests:
+          - not_null
+      - name: zip_code
+        description: "First 5 digits of customer zip code"
+        tests:
+          - not_null
+      - name: city
+        description: "Normalized customer city name"
+        tests:
+          - not_null
+      - name: state_code
+        description: "Customer state code (2 letters, uppercased)"
+        tests:
+          - not_null
+
+  - name: stg_orders
+    description: "Cleaned and deduplicated orders with cast timestamps"
+    columns:
+      - name: order_id
+        description: "Unique identifier for each order"
+        tests:
+          - not_null
+          - unique
+      - name: customer_id
+        description: "Foreign key to stg_customers"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_customers')
+              field: customer_id
+      - name: order_status
+        description: "Lowercased and trimmed order status"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['delivered', 'shipped', 'canceled', 'invoiced', 'processing', 'approved', 'unavailable', 'created']
+      - name: order_purchase_timestamp
+        description: "Timestamp when the order was purchased"
+        tests:
+          - not_null
+      - name: order_approved_at
+        description: "Timestamp when the payment was approved"
+      - name: order_delivered_carrier_date
+        description: "Timestamp when the order was handed to the carrier"
+      - name: order_delivered_customer_date
+        description: "Timestamp when the order was delivered to the customer"
+      - name: order_estimated_delivery_date
+        description: "Estimated delivery date shown to customer at purchase"
+
+  - name: stg_products
+    description: "Cleaned product catalog with English category names"
+    columns:
+      - name: product_id
+        description: "Unique identifier for each product"
+        tests:
+          - not_null
+          - unique
+      - name: product_category
+        description: "English product category name, defaulting to uncategorized"
+        tests:
+          - not_null
+      - name: product_name_length
+        description: "Number of characters in the product name"
+      - name: product_description_length
+        description: "Number of characters in the product description"
+      - name: product_photos_qty
+        description: "Number of product photos"
+      - name: product_weight_g
+        description: "Product weight in grams"
+      - name: product_length_cm
+        description: "Product length in centimeters"
+      - name: product_height_cm
+        description: "Product height in centimeters"
+      - name: product_width_cm
+        description: "Product width in centimeters"
+
+  - name: stg_order_items
+    description: "Cleaned order line items enriched with product category"
+    columns:
+      - name: order_id
+        description: "Foreign key to stg_orders"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_orders')
+              field: order_id
+      - name: order_item_id
+        description: "Sequential identifier for items within an order"
+        tests:
+          - not_null
+      - name: product_id
+        description: "Foreign key to stg_products"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_products')
+              field: product_id
+      - name: seller_id
+        description: "Foreign key to stg_sellers"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_sellers')
+              field: seller_id
+      - name: shipping_limit_date
+        description: "Deadline for the seller to ship the item"
+      - name: price
+        description: "Price of the item"
+        tests:
+          - not_null
+          - positive_value
+      - name: freight_value
+        description: "Freight/shipping cost for the item"
+        tests:
+          - not_null
+          - positive_value
+      - name: product_category
+        description: "English product category enriched from stg_products"
+
+  - name: stg_payments
+    description: "Cleaned payment records with standardized payment types"
+    columns:
+      - name: order_id
+        description: "Foreign key to stg_orders"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_orders')
+              field: order_id
+      - name: payment_sequential
+        description: "Sequential number for multiple payments on same order"
+        tests:
+          - not_null
+      - name: payment_type
+        description: "Standardized payment type"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['credit_card', 'boleto', 'voucher', 'debit_card', 'unknown']
+      - name: payment_installments
+        description: "Number of installments chosen by customer"
+      - name: payment_value
+        description: "Value of the payment transaction"
+        tests:
+          - not_null
+          - positive_value
+
+  - name: stg_order_reviews
+    description: "Cleaned customer reviews with validated scores"
+    columns:
+      - name: review_id
+        description: "Unique identifier for each review"
+        tests:
+          - not_null
+          - unique
+      - name: order_id
+        description: "Foreign key to stg_orders"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_orders')
+              field: order_id
+      - name: review_score
+        description: "Rating given by customer (1-5)"
+        tests:
+          - not_null
+          - accepted_values:
+              values: [1, 2, 3, 4, 5]
+      - name: review_comment_title
+        description: "Trimmed title of the review comment"
+      - name: review_comment_message
+        description: "Trimmed body of the review comment"
+      - name: review_creation_date
+        description: "Timestamp when the review was created"
+      - name: review_answer_timestamp
+        description: "Timestamp when the review was answered"
+
+  - name: stg_sellers
+    description: "Cleaned seller records with normalized city and state"
+    columns:
+      - name: seller_id
+        description: "Unique identifier for each seller"
+        tests:
+          - not_null
+          - unique
+      - name: zip_code
+        description: "First 5 digits of seller zip code"
+        tests:
+          - not_null
+      - name: city
+        description: "Normalized seller city name"
+        tests:
+          - not_null
+      - name: state_code
+        description: "Seller state code (2 letters, uppercased)"
+        tests:
+          - not_null
+
+  - name: stg_geolocation
+    description: "Cleaned geolocation data with averaged coordinates per zip code"
+    columns:
+      - name: zip_code
+        description: "First 5 digits of zip code"
+        tests:
+          - not_null
+      - name: latitude
+        description: "Average latitude coordinate for the zip code"
+        tests:
+          - not_null
+      - name: longitude
+        description: "Average longitude coordinate for the zip code"
+        tests:
+          - not_null
+      - name: city
+        description: "Normalized city name"
+      - name: state_code
+        description: "State code (2 letters, uppercased)"
