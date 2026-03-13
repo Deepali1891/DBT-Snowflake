@@ -6,7 +6,7 @@ sources:
       Raw data loaded from AWS S3 into Snowflake's bronze schema.
       These tables are populated via Snowflake external stages or COPY INTO commands
       and represent the landing zone for all ingested data.
-    database: "CAPSTONE_DG"
+    database: "CAPSTONE_AS"
     schema: bronze
     
     # # Optional: Add freshness checks for data quality monitoring
