@@ -176,6 +176,33 @@ COPY INTO ANALYTICS.BRONZE.RAW_PRODUCTS  FROM @s3_stage/products/  FILE_FORMAT =
 
 ---
 
+## Silver Layer – Staging Models
+
+The silver layer cleans, types, and standardises all 8 raw bronze sources into analysis-ready staging tables.
+
+| Model | Source(s) | Key Transformations |
+|---|---|---|
+| `stg_customers` | `raw_customers` | Normalize city/state |
+| `stg_orders` | `raw_orders` | Dedup, cast timestamps, normalize `order_status` |
+| `stg_order_items` | `raw_order_items` + `stg_products` | Dedup, cast price/freight, enrich with `product_category` |
+| `stg_products` | `raw_products` + translation table | English category names, cast dimensions |
+| `stg_payments` | `raw_order_payments` | Dedup, normalize `payment_type`, cast `payment_value` |
+| `stg_order_reviews` | `raw_order_reviews` | Dedup, validate `review_score` (1–5), cast timestamps |
+| `stg_sellers` | `raw_sellers` | Normalize city/state |
+| `stg_geolocation` | `raw_geolocation` | Average lat/lng per zip code, normalize city/state |
+
+### City Standardization
+
+Consistent city-normalization logic is applied across all relevant staging models (`stg_customers`, `stg_sellers`, `stg_geolocation`) to ensure professional reporting accuracy. Top-tier cities are explicitly mapped with their proper Portuguese diacritics (e.g., `São Paulo`, `Brasília`), while all remaining cities are normalized using a standard `INITCAP` case correction.
+
+### Business Logic Validation
+
+- Duplicates removed via `ROW_NUMBER()` on all applicable models
+- Timestamps cast to `TIMESTAMP_NTZ` throughout
+- Invalid rows excluded: null primary keys, `price <= 0`, `review_score` outside 1–5, future purchase dates
+
+---
+
 ## Running dbt Models
 
 ### Run all models (silver + gold)
