@@ -62,7 +62,8 @@ models:
         tests:
           - not_null
           - accepted_values:
-              values: ['delivered','shipped','canceled','invoiced','processing','approved','unavailable','created']
+              arguments:
+                values: ['delivered','shipped','canceled','invoiced','processing','approved','unavailable','created']
       - name: order_date
         description: "Timestamp when the order was placed"
         tests:
@@ -107,7 +108,8 @@ models:
         description: "Relative price tier within category"
         tests:
           - accepted_values:
-              values: ['Budget', 'Mid-range', 'Premium', 'Unknown']
+              arguments:
+                values: ['Budget', 'Mid-range', 'Premium', 'Unknown']
 
   # ─────────────────────────────────────────────────────────────
   # MARTS — Product intelligence
@@ -152,13 +154,15 @@ models:
         description: "Growing / Stable / Declining based on recent vs prior 3 months"
         tests:
           - accepted_values:
-              values: ['Growing', 'Stable', 'Declining']
+              arguments:
+                values: ['Growing', 'Stable', 'Declining']
       - name: lifecycle_classification
         description: "Shooting Star / Long-term Classic / Steady Performer / Fading / Niche / Emerging"
         tests:
           - not_null
           - accepted_values:
-              values: ['Shooting Star', 'Long-term Classic', 'Steady Performer', 'Fading', 'Niche', 'Emerging']
+              arguments:
+                values: ['Shooting Star', 'Long-term Classic', 'Steady Performer', 'Fading', 'Niche', 'Emerging']
 
   - name: mart_product_sales_cohort
     description: >
@@ -245,12 +249,14 @@ models:
         description: "High (≥30 reviews) / Medium (10–29) / Low (<10)"
         tests:
           - accepted_values:
-              values: ['High', 'Medium', 'Low']
+              arguments:
+                values: ['High', 'Medium', 'Low']
       - name: satisfaction_trend
         description: "Improving / Stable / Declining — first vs second half of review period"
         tests:
           - accepted_values:
-              values: ['Improving', 'Stable', 'Declining']
+              arguments:
+                values: ['Improving', 'Stable', 'Declining']
       - name: has_text_feedback
         description: "True if at least one review has a written comment"
       - name: reviews_with_text
@@ -259,7 +265,8 @@ models:
         description: "Always 'single_item_orders_only' — documents the attribution method"
         tests:
           - accepted_values:
-              values: ['single_item_orders_only']
+              arguments:
+                values: ['single_item_orders_only']
 
   - name: mart_product_campaign_score
     description: >
@@ -291,4 +298,5 @@ models:
         tests:
           - not_null
           - accepted_values:
-              values: ['High Priority', 'Reactivate', 'Monitor', 'Retire']
+              arguments:
+                values: ['High Priority', 'Reactivate', 'Monitor', 'Retire']
