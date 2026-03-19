@@ -1,5 +1,11 @@
 with source as (
-    select * from {{ source('bronze', 'raw_order_payments') }}
+    select
+        "c1" as order_id,
+        "c2" as payment_sequential,
+        "c3" as payment_type,
+        "c4" as payment_installments,
+        "c5" as payment_value
+    from {{ source('bronze', 'raw_order_payments') }}
 ),
 deduped as (
     select *,

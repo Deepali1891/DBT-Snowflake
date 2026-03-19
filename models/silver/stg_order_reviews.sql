@@ -1,5 +1,13 @@
 with source as (
-    select * from {{ source('bronze', 'raw_order_reviews') }}
+    select
+        "c1" as review_id,
+        "c2" as order_id,
+        "c3" as review_score,
+        "c4" as review_comment_title,
+        "c5" as review_comment_message,
+        "c6" as review_creation_date,
+        "c7" as review_answer_timestamp
+    from {{ source('bronze', 'raw_order_reviews') }}
 ),
 deduped as (
     select *,

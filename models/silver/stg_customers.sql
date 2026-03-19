@@ -5,7 +5,7 @@ cleaned as (
     select
         customer_id,
         customer_unique_id,
-        customer_zip_code_prefix as zip_code,
+        cast(customer_zip_code_prefix as varchar) as zip_code,
         case 
             when lower(customer_city) = 'sao paulo' then 'São Paulo'
             when lower(customer_city) = 'rio de janeiro' then 'Rio de Janeiro'

@@ -1,5 +1,13 @@
 with source as (
-    select * from {{ source('bronze', 'raw_order_items') }}
+    select
+        "c1" as order_id,
+        "c2" as order_item_id,
+        "c3" as product_id,
+        "c4" as seller_id,
+        "c5" as shipping_limit_date,
+        "c6" as price,
+        "c7" as freight_value
+    from {{ source('bronze', 'raw_order_items') }}
 ),
 deduped as (
     select *,

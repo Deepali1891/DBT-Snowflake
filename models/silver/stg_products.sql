@@ -1,8 +1,21 @@
 with products as (
-    select * from {{ source('bronze', 'raw_products') }}
+    select
+        "c1" as product_id,
+        "c2" as product_category_name,
+        "c3" as product_name_length,
+        "c4" as product_description_length,
+        "c5" as product_photos_qty,
+        "c6" as product_weight_g,
+        "c7" as product_length_cm,
+        "c8" as product_height_cm,
+        "c9" as product_width_cm
+    from {{ source('bronze', 'raw_products') }}
 ),
 translations as (
-    select * from {{ source('bronze', 'raw_product_category_name_translation') }}
+    select
+        "c1" as product_category_name,
+        "c2" as product_category_name_english
+    from {{ source('bronze', 'raw_product_category_name_translation') }}
 ),
 cleaned as (
     select
