@@ -178,28 +178,71 @@ COPY INTO ANALYTICS.BRONZE.RAW_PRODUCTS  FROM @s3_stage/products/  FILE_FORMAT =
 
 ## Silver Layer – Staging Models
 
-The silver layer cleans, types, and standardises all 8 raw bronze sources into analysis-ready staging tables.
+**Why it exists:** The Olist dataset arrives from S3 as headerless CSV files. Snowflake loads these into bronze tables with positional column names (`"c1"`, `"c2"`, ..., `"cN"`). The silver layer's primary job is to give every column a meaningful name, enforce correct data types, and remove unusable rows — so all downstream models can rely on clean, trustworthy data without re-implementing the same defensive logic.
 
-| Model | Source(s) | Key Transformations |
+Each `stg_*` model is a direct, 1-to-1 transformation of a single source table. No inter-model joins occur at this layer; silver is intentionally a clean copy of bronze, not a derived view.
+
+| Model | Source Table | Key Intent |
 |---|---|---|
-| `stg_customers` | `raw_customers` | Normalize city/state |
-| `stg_orders` | `raw_orders` | Dedup, cast timestamps, normalize `order_status` |
-| `stg_order_items` | `raw_order_items` + `stg_products` | Dedup, cast price/freight, enrich with `product_category` |
-| `stg_products` | `raw_products` + translation table | English category names, cast dimensions |
-| `stg_payments` | `raw_order_payments` | Dedup, normalize `payment_type`, cast `payment_value` |
-| `stg_order_reviews` | `raw_order_reviews` | Dedup, validate `review_score` (1–5), cast timestamps |
-| `stg_sellers` | `raw_sellers` | Normalize city/state |
-| `stg_geolocation` | `raw_geolocation` | Average lat/lng per zip code, normalize city/state |
+| `stg_customers` | `raw_customers` | Only bronze table with named columns — cast zip code to VARCHAR |
+| `stg_orders` | `raw_orders` | Alias positional columns, dedup, cast all timestamps |
+| `stg_order_items` | `raw_order_items` | Alias positional columns, cast price and freight to FLOAT |
+| `stg_products` | `raw_products` | Alias positional columns, translate category names to English |
+| `stg_payments` | `raw_order_payments` | Alias positional columns, normalize `payment_type` |
+| `stg_order_reviews` | `raw_order_reviews` | Alias positional columns, validate `review_score` in range [1, 5] |
+| `stg_sellers` | `raw_sellers` | Alias positional columns, normalize city/state |
+| `stg_geolocation` | `raw_geolocation` | Alias positional columns, collapse to **one row per zip** by averaging lat/lng |
 
-### City Standardization
+**Key design decisions:**
 
-Consistent city-normalization logic is applied across all relevant staging models (`stg_customers`, `stg_sellers`, `stg_geolocation`) to ensure professional reporting accuracy. Top-tier cities are explicitly mapped with their proper Portuguese diacritics (e.g., `São Paulo`, `Brasília`), while all remaining cities are normalized using a standard `INITCAP` case correction.
+- **Positional column aliasing** — Every source CTE uses explicit `"c1" as column_name` aliases. `SELECT *` from bronze would return unlabelled columns and break all downstream logic.
+- **Geolocation dedup** — `raw_geolocation` has many rows per zip code (varying coordinates). Silver reduces this to one representative row per zip to prevent join fan-out in gold.
+- **City normalization** — Applied in `stg_customers`, `stg_sellers`, and `stg_geolocation` using a hand-curated map for top cities with correct Portuguese diacritics (e.g., `São Paulo`, `Brasília`), and `INITCAP` as a fallback for all others.
+- **Row exclusions** — Null primary keys, `price <= 0`, `review_score` outside [1, 5], and future-dated purchase timestamps are filtered out.
+- **Deduplication** — All models remove duplicate rows using `ROW_NUMBER()` on their natural primary key before exposing data to gold.
 
-### Business Logic Validation
+---
 
-- Duplicates removed via `ROW_NUMBER()` on all applicable models
-- Timestamps cast to `TIMESTAMP_NTZ` throughout
-- Invalid rows excluded: null primary keys, `price <= 0`, `review_score` outside 1–5, future purchase dates
+## Gold Layer – Foundation Tables & Product Marts
+
+**Why it exists:** Silver models are clean representations of individual source tables. Gold is where sources are joined, metrics are computed, and results are shaped into answers to specific business questions.
+
+The gold layer has two tiers:
+
+**Foundation tables** (`fct_*`, `dim_*`) are general-purpose building blocks. They join silver models once, compute core metrics, and serve as the shared input for all marts — avoiding duplicated join logic across downstream models.
+
+**Product marts** (`mart_product_*`) each answer one focused question about product performance. They are pre-aggregated, self-contained, and intended to be queried directly by BI tools or analysts without further transformation.
+
+### Foundation Tables
+
+| Model | Grain | Purpose |
+|---|---|---|
+| `fct_order_items` | One row per order line item | Core transactional fact: price, freight, seller, and an `is_single_item_order` flag |
+| `fct_orders` | One row per order | Aggregated order: total payment, delivery days, on-time flag, avg satisfaction score |
+| `dim_products` | One row per product | Product catalog with avg/min/max price and a `price_tier` (Budget / Mid-range / Premium) derived via `NTILE(3)` within each category |
+
+### Product Marts
+
+| Model | Grain | Question answered |
+|---|---|---|
+| `mart_product_lifecycle` | One row per product | When did this product enter the market? How is volume distributed across age buckets (months 1–3, 4–6, 7–12, 13+)? What is its lifecycle classification? |
+| `mart_product_sales_cohort` | One row per product × calendar month | What does revenue look like month by month, normalised to *months since market entry* for fair cross-product comparison? |
+| `mart_product_engagement` | One row per product | How many buyers were new to the platform? How many returned for a repeat purchase? How many sellers carry this product? |
+| `mart_product_experience` | One row per product | What is the clean satisfaction signal for this product, and is it improving or declining over time? |
+| `mart_product_campaign_score` | One row per product | Which products deserve marketing investment right now, and why? |
+
+**Key design decisions:**
+
+- **`market_entry_date` vs. a catalog launch date** — The dataset has no product launch date. `market_entry_date` is defined as the earliest *delivered* order date for each product. This is a data-inferred proxy, not an authoritative record; the column name was chosen to make that limitation explicit.
+- **`mart_product_experience` scoped to single-item orders only** — Customer reviews are attached to orders, not to individual products. In multi-item orders (~10% of all orders) it is impossible to know which product a review reflects. This mart filters to single-item orders and surfaces a `satisfaction_scope = 'single_item_orders_only'` column so consumers understand the constraint.
+- **`price_tier` computed within category** — Tiers are derived via `NTILE(3)` partitioned by `product_category`, not globally. "Premium" means the top third of *that category's* price range, giving the label contextual meaning instead of an absolute price cutoff.
+- **Campaign score weighting** — `mart_product_campaign_score` combines four signals into a 0–100 composite score:
+  - Lifecycle stage (30%) — rewards products in early, high-growth periods
+  - Recent sales trend (25%) — rewards rising momentum
+  - Engagement (25%) — rewards high repeat-purchase rates
+  - Satisfaction (20%) — penalises poor or declining reviews
+
+  Output is a `campaign_recommendation` label: **High Priority**, **Reactivate**, **Monitor**, or **Retire**.
 
 ---
 
@@ -258,18 +301,6 @@ Tests cover:
 
 ---
 
-## Snapshots (Type-2 SCD)
-
-Capture historical changes to the customers table:
-
-```bash
-dbt snapshot
-```
-
-The snapshot is stored in the `snapshots` schema and tracks changes using the `updated_at` timestamp strategy.
-
----
-
 ## Project Structure
 
 ```
@@ -290,18 +321,25 @@ DBT-Snowflake/
 │   ├── bronze/
 │   │   └── sources.yml          # Source definitions for raw S3-loaded tables
 │   ├── silver/
-│   │   ├── stg_customers.sql    # Cleaned customer records
-│   │   ├── stg_orders.sql       # Cleaned order records
-│   │   ├── stg_products.sql     # Cleaned product records
-│   │   └── schema.yml           # Column docs & tests for silver models
+│   │   ├── stg_customers.sql         # Cleaned customer records
+│   │   ├── stg_orders.sql            # Cleaned order records
+│   │   ├── stg_order_items.sql       # Cleaned order line item records
+│   │   ├── stg_products.sql          # Cleaned product records (English categories)
+│   │   ├── stg_payments.sql          # Cleaned payment records
+│   │   ├── stg_order_reviews.sql     # Cleaned review records
+│   │   ├── stg_sellers.sql           # Cleaned seller records
+│   │   ├── stg_geolocation.sql       # One row per zip code (lat/lng averaged)
+│   │   └── schema.yml                # Column docs & tests for silver models
 │   └── gold/
-│       ├── dim_customers.sql    # Customer dimension with order metrics
-│       ├── dim_products.sql     # Product dimension with sales metrics
-│       ├── fct_orders.sql       # Central orders fact table
-│       ├── mart_customer_orders.sql  # Customer-level order analytics mart
-│       └── schema.yml           # Column docs & tests for gold models
-├── snapshots/
-│   └── customers_snapshot.sql  # Type-2 SCD snapshot for customers
+│       ├── fct_order_items.sql            # Order line item fact table
+│       ├── fct_orders.sql                 # Order-level fact table
+│       ├── dim_products.sql               # Product catalog with price tiers
+│       ├── mart_product_lifecycle.sql     # Lifecycle classification and age buckets
+│       ├── mart_product_sales_cohort.sql  # Month-by-month revenue per product
+│       ├── mart_product_engagement.sql    # Repeat-buyer and new-buyer metrics
+│       ├── mart_product_experience.sql    # Satisfaction scores (single-item orders)
+│       ├── mart_product_campaign_score.sql  # Composite campaign potential score
+│       └── schema.yml                     # Column docs & tests for gold models
 └── tests/
     └── generic/
         └── positive_value.sql   # Custom generic test: value must be > 0
@@ -329,7 +367,6 @@ DBT-Snowflake/
 | `dbt deps` | Install packages from `packages.yml` |
 | `dbt run` | Build all models |
 | `dbt test` | Run all schema and custom tests |
-| `dbt snapshot` | Run snapshots |
 | `dbt docs generate` | Generate documentation site |
 | `dbt docs serve` | Serve documentation locally at http://localhost:8080 |
 | `dbt compile` | Compile SQL without executing |
