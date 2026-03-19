@@ -1,0 +1,294 @@
+version: 2
+
+models:
+
+  # ─────────────────────────────────────────────────────────────
+  # FOUNDATION — Facts
+  # ─────────────────────────────────────────────────────────────
+
+  - name: fct_order_items
+    description: >
+      Grain: one row per order line item. Core fact table enriched with
+      order status, order date, and a flag identifying single-item orders
+      (used by mart_product_experience for clean review attribution).
+    columns:
+      - name: order_item_sk
+        description: "Surrogate key — hash of order_id + order_item_id"
+        tests:
+          - not_null
+          - unique
+      - name: order_id
+        description: "Foreign key to fct_orders"
+        tests:
+          - not_null
+      - name: order_item_id
+        description: "Sequential item number within the order"
+        tests:
+          - not_null
+      - name: product_id
+        description: "Foreign key to dim_products"
+        tests:
+          - not_null
+      - name: seller_id
+        description: "Seller who fulfilled this line item"
+        tests:
+          - not_null
+      - name: price
+        description: "Item selling price"
+        tests:
+          - not_null
+      - name: total_item_value
+        description: "price + freight_value"
+      - name: is_single_item_order
+        description: "True when this order contains exactly one line item"
+
+  - name: fct_orders
+    description: >
+      Grain: one row per order. Joins orders, customers, items, payments,
+      and reviews into a single analytics-ready record. avg_satisfaction_score
+      reflects overall order experience (delivery + product combined).
+    columns:
+      - name: order_id
+        description: "Unique order identifier (PK)"
+        tests:
+          - not_null
+          - unique
+      - name: customer_id
+        description: "Foreign key to stg_customers"
+        tests:
+          - not_null
+      - name: status
+        description: "Order status"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['delivered','shipped','canceled','invoiced','processing','approved','unavailable','created']
+      - name: order_date
+        description: "Timestamp when the order was placed"
+        tests:
+          - not_null
+      - name: total_revenue
+        description: "Sum of item prices + freight for the order"
+      - name: avg_satisfaction_score
+        description: >
+          Average review score (1–5) for this order. Reflects overall
+          purchase experience — may include delivery and/or product sentiment.
+      - name: is_delivered
+        description: "True when order_status = 'delivered'"
+      - name: delivery_days
+        description: "Days from order_date to order_delivered_customer_date"
+      - name: is_on_time
+        description: "True when delivered on or before estimated delivery date"
+      - name: is_single_item_order
+        description: "True when the order contained exactly one line item"
+
+  # ─────────────────────────────────────────────────────────────
+  # FOUNDATION — Dimensions
+  # ─────────────────────────────────────────────────────────────
+
+  - name: dim_products
+    description: >
+      Grain: one row per product. Combines product attributes from the
+      catalog with a price_tier derived from avg selling price percentiles
+      within each category (Budget / Mid-range / Premium).
+    columns:
+      - name: product_id
+        description: "Unique product identifier (PK)"
+        tests:
+          - not_null
+          - unique
+      - name: product_category
+        description: "English product category name"
+        tests:
+          - not_null
+      - name: avg_price
+        description: "Average selling price across all order items"
+      - name: price_tier
+        description: "Relative price tier within category"
+        tests:
+          - accepted_values:
+              values: ['Budget', 'Mid-range', 'Premium', 'Unknown']
+
+  # ─────────────────────────────────────────────────────────────
+  # MARTS — Product intelligence
+  # ─────────────────────────────────────────────────────────────
+
+  - name: mart_product_lifecycle
+    description: >
+      Grain: one row per product (delivered orders only).
+      Tracks sales volume by period offset from market_entry_date
+      and classifies each product into a lifecycle stage.
+      market_entry_date is data-inferred (first delivered order date),
+      not a catalog launch date.
+    columns:
+      - name: product_id
+        description: "Unique product identifier (PK)"
+        tests:
+          - not_null
+          - unique
+      - name: market_entry_date
+        description: "Date of first delivered order — inferred market entry"
+        tests:
+          - not_null
+      - name: last_sale_date
+        description: "Date of most recent delivered order"
+      - name: active_selling_months
+        description: "Months between market_entry_date and last_sale_date"
+      - name: units_m1_m3
+        description: "Units sold in months 1–3 after market entry"
+      - name: units_m4_m6
+        description: "Units sold in months 4–6 after market entry"
+      - name: units_m7_m12
+        description: "Units sold in months 7–12 after market entry"
+      - name: units_m13_plus
+        description: "Units sold from month 13 onwards"
+      - name: peak_sales_month_offset
+        description: "Month offset (from entry) with the highest unit sales"
+      - name: recent_3m_units
+        description: "Units sold in the last 3 months relative to last_sale_date"
+      - name: prior_3m_units
+        description: "Units sold in months 3–5 before last_sale_date"
+      - name: recent_trend
+        description: "Growing / Stable / Declining based on recent vs prior 3 months"
+        tests:
+          - accepted_values:
+              values: ['Growing', 'Stable', 'Declining']
+      - name: lifecycle_classification
+        description: "Shooting Star / Long-term Classic / Steady Performer / Fading / Niche / Emerging"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Shooting Star', 'Long-term Classic', 'Steady Performer', 'Fading', 'Niche', 'Emerging']
+
+  - name: mart_product_sales_cohort
+    description: >
+      Grain: one row per product × calendar month (delivered orders only).
+      Cohorts products on their own timeline via months_since_market_entry
+      so that cross-product comparisons are normalised to lifecycle stage,
+      not calendar date. Includes MoM revenue change and cumulative revenue.
+    columns:
+      - name: product_id
+        description: "Product identifier"
+        tests:
+          - not_null
+      - name: calendar_month
+        description: "Calendar month of sales (DATE, first day of month)"
+        tests:
+          - not_null
+      - name: market_entry_month
+        description: "Month the product first appeared in delivered orders"
+      - name: months_since_market_entry
+        description: "Integer offset from market_entry_month to calendar_month"
+      - name: orders_count
+        description: "Distinct orders containing this product in this month"
+      - name: units_sold
+        description: "Line items sold (one product can appear in multiple orders)"
+      - name: revenue
+        description: "Sum of price + freight for this product in this month"
+      - name: cumulative_revenue
+        description: "Running total revenue from market entry to this month"
+      - name: mom_revenue_pct_change
+        description: "Month-over-month revenue % change (null for first month)"
+
+  - name: mart_product_engagement
+    description: >
+      Grain: one row per product (delivered orders only).
+      Tracks buyer behaviour — repeat purchases, new buyer identification,
+      and seller concentration.
+    columns:
+      - name: product_id
+        description: "Unique product identifier (PK)"
+        tests:
+          - not_null
+          - unique
+      - name: total_unique_buyers
+        description: "Distinct customer_unique_id who bought this product"
+      - name: repeat_buyers
+        description: "Buyers who purchased this product in 2+ separate orders"
+      - name: repeat_purchase_rate
+        description: "repeat_buyers / total_unique_buyers (0–1)"
+      - name: avg_days_between_purchases
+        description: "Average days from first to last purchase for repeat buyers"
+      - name: new_buyers
+        description: "Buyers whose very first ever order contained this product"
+      - name: avg_new_buyer_item_value
+        description: "Average item value (price + freight) for new buyer orders"
+      - name: seller_count
+        description: >
+          Number of distinct sellers carrying this product.
+          Low count = experience score more reflective of one seller's performance.
+
+  - name: mart_product_experience
+    description: >
+      Grain: one row per product. Standalone purchase experience signal
+      derived exclusively from single-item orders, ensuring each review
+      maps to exactly one product. Scores reflect the overall purchase
+      experience (delivery + product) — the two cannot be separated from
+      review text alone. satisfaction_scope column makes this explicit.
+    columns:
+      - name: product_id
+        description: "Unique product identifier (PK)"
+        tests:
+          - not_null
+          - unique
+      - name: total_reviews
+        description: "Reviews from single-item orders only"
+      - name: avg_satisfaction_score
+        description: "Average review score (1–5) — overall purchase experience"
+      - name: pct_positive
+        description: "% of reviews with score 4 or 5"
+      - name: pct_neutral
+        description: "% of reviews with score 3"
+      - name: pct_negative
+        description: "% of reviews with score 1 or 2"
+      - name: satisfaction_confidence
+        description: "High (≥30 reviews) / Medium (10–29) / Low (<10)"
+        tests:
+          - accepted_values:
+              values: ['High', 'Medium', 'Low']
+      - name: satisfaction_trend
+        description: "Improving / Stable / Declining — first vs second half of review period"
+        tests:
+          - accepted_values:
+              values: ['Improving', 'Stable', 'Declining']
+      - name: has_text_feedback
+        description: "True if at least one review has a written comment"
+      - name: reviews_with_text
+        description: "Count of reviews containing written comment or title text"
+      - name: satisfaction_scope
+        description: "Always 'single_item_orders_only' — documents the attribution method"
+        tests:
+          - accepted_values:
+              values: ['single_item_orders_only']
+
+  - name: mart_product_campaign_score
+    description: >
+      Grain: one row per product. Decision-ready campaign prioritisation table.
+      Combines lifecycle, revenue trend, engagement, and experience signals
+      into a composite campaign_potential_score (0–100) and a
+      campaign_recommendation label. Score weights: lifecycle 30, trend 25,
+      engagement 25, satisfaction 20.
+    columns:
+      - name: product_id
+        description: "Unique product identifier (PK)"
+        tests:
+          - not_null
+          - unique
+      - name: lifecycle_component
+        description: "Lifecycle contribution to score (0–30)"
+      - name: trend_component
+        description: "Revenue trend contribution to score (0–25)"
+      - name: engagement_component
+        description: "Repeat purchase rate contribution to score (0–25)"
+      - name: satisfaction_component
+        description: "Experience score contribution (0–20); 10 when no review data"
+      - name: campaign_potential_score
+        description: "Composite score 0–100 (sum of four components)"
+        tests:
+          - not_null
+      - name: campaign_recommendation
+        description: "High Priority / Reactivate / Monitor / Retire"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['High Priority', 'Reactivate', 'Monitor', 'Retire']
