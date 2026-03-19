@@ -1,7 +1,9 @@
 -- Analysis: monthly revenue summary
 -- Run with: dbt compile --select analyses/monthly_revenue_summary
 -- Then execute the compiled SQL directly in Snowflake.
+-- NOTE: uncomment once fct_orders gold model is built.
 
+{#
 select
     date_trunc('month', order_date)   as order_month,
     customer_country,
@@ -13,3 +15,6 @@ from {{ ref('fct_orders') }}
 where status = 'delivered'
 group by 1, 2, 3
 order by 1 desc, total_revenue desc
+#}
+
+select 1 as placeholder
