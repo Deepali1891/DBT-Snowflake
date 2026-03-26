@@ -39,14 +39,16 @@ models:
         tests:
           - not_null
           - relationships:
-              to: ref('stg_customers')
-              field: customer_id
+              arguments:
+                to: ref('stg_customers')
+                field: customer_id
       - name: order_status
         description: "Lowercased and trimmed order status"
         tests:
           - not_null
           - accepted_values:
-              values: ['delivered', 'shipped', 'canceled', 'invoiced', 'processing', 'approved', 'unavailable', 'created']
+              arguments:
+                values: ['delivered', 'shipped', 'canceled', 'invoiced', 'processing', 'approved', 'unavailable', 'created']
       - name: order_purchase_timestamp
         description: "Timestamp when the order was purchased"
         tests:
@@ -95,8 +97,9 @@ models:
         tests:
           - not_null
           - relationships:
-              to: ref('stg_orders')
-              field: order_id
+              arguments:
+                to: ref('stg_orders')
+                field: order_id
       - name: order_item_id
         description: "Sequential identifier for items within an order"
         tests:
@@ -106,15 +109,17 @@ models:
         tests:
           - not_null
           - relationships:
-              to: ref('stg_products')
-              field: product_id
+              arguments:
+                to: ref('stg_products')
+                field: product_id
       - name: seller_id
         description: "Foreign key to stg_sellers"
         tests:
           - not_null
           - relationships:
-              to: ref('stg_sellers')
-              field: seller_id
+              arguments:
+                to: ref('stg_sellers')
+                field: seller_id
       - name: shipping_limit_date
         description: "Deadline for the seller to ship the item"
       - name: price
@@ -138,8 +143,9 @@ models:
         tests:
           - not_null
           - relationships:
-              to: ref('stg_orders')
-              field: order_id
+              arguments:
+                to: ref('stg_orders')
+                field: order_id
       - name: payment_sequential
         description: "Sequential number for multiple payments on same order"
         tests:
@@ -149,7 +155,8 @@ models:
         tests:
           - not_null
           - accepted_values:
-              values: ['credit_card', 'boleto', 'voucher', 'debit_card', 'unknown']
+              arguments:
+                values: ['credit_card', 'boleto', 'voucher', 'debit_card', 'unknown']
       - name: payment_installments
         description: "Number of installments chosen by customer"
       - name: payment_value
@@ -171,14 +178,16 @@ models:
         tests:
           - not_null
           - relationships:
-              to: ref('stg_orders')
-              field: order_id
+              arguments:
+                to: ref('stg_orders')
+                field: order_id
       - name: review_score
         description: "Rating given by customer (1-5)"
         tests:
           - not_null
           - accepted_values:
-              values: [1, 2, 3, 4, 5]
+              arguments:
+                values: [1, 2, 3, 4, 5]
       - name: review_comment_title
         description: "Trimmed title of the review comment"
       - name: review_comment_message

@@ -1,5 +1,10 @@
 with source as (
-    select * from {{ source('bronze', 'raw_sellers') }}
+    select
+        "c1" as seller_id,
+        "c2" as seller_zip_code_prefix,
+        "c3" as seller_city,
+        "c4" as seller_state
+    from {{ source('bronze', 'raw_sellers') }}
 ),
 cleaned as (
     select

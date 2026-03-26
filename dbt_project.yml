@@ -21,10 +21,6 @@ clean-targets:
 # Model configurations by folder/layer
 models:
   ecommerce_pipeline:
-    # Bronze layer: raw data loaded from S3 - stored as views for lightweight access
-    bronze:
-      +schema: bronze
-      
     # Silver layer: cleaned and transformed data - stored as tables for performance
     silver:
       +materialized: table
@@ -36,15 +32,3 @@ models:
       +materialized: table
       +schema: gold
       +tags: ['gold']
-
-# Seed configurations
-seeds:
-  ecommerce_pipeline:
-    +schema: seeds
-
-# Snapshot configurations
-snapshots:
-  ecommerce_pipeline:
-    +target_schema: snapshots
-    +strategy: timestamp
-    +updated_at: updated_at
